@@ -21,6 +21,16 @@ const TMUX_SESSION_PREFIX = 'omc-team';
 const promisifiedExec = promisify(exec);
 const promisifiedExecFile = promisify(execFile);
 
+export type TeamMultiplexerContext = 'tmux' | 'cmux' | 'none';
+
+export function detectTeamMultiplexerContext(
+  env: NodeJS.ProcessEnv = process.env,
+): TeamMultiplexerContext {
+  if (env.TMUX) return 'tmux';
+  if (env.CMUX_SURFACE_ID) return 'cmux';
+  return 'none';
+}
+
 /**
  * True when running on Windows under MSYS2/Git Bash.
  * Tmux panes run bash in this environment, not cmd.exe.
@@ -409,11 +419,15 @@ export function spawnBridgeInSession(
 /**
  * Create a tmux team topology for a team leader/worker layout.
  *
- * Must be run inside an existing tmux session ($TMUX must be set).
- * By default, creates splits in the CURRENT window so panes appear immediately
- * in the user's view. When options.newWindow is true, creates a detached
- * dedicated tmux window first and then splits worker panes there.
- * Returns sessionName in "session:window" form.
+ * When running inside a classic tmux session, creates splits in the CURRENT
+ * window so panes appear immediately in the user's view. When options.newWindow
+ * is true, creates a detached dedicated tmux window first and then splits worker
+ * panes there.
+ *
+ * When running inside cmux (CMUX_SURFACE_ID without TMUX) or a plain terminal,
+ * falls back to a detached tmux session because the current surface cannot be
+ * targeted as a normal tmux pane/window. Returns sessionName in "session:window"
+ * form.
  *
  * Layout: leader pane on the left, worker panes stacked vertically on the right.
  * IMPORTANT: Uses pane IDs (%N format) not pane indices for stable targeting.
@@ -428,7 +442,8 @@ export async function createTeamSession(
   const { promisify } = await import('util');
   const execFileAsync = promisify(execFile);
 
-  const inTmux = Boolean(process.env.TMUX);
+  const multiplexerContext = detectTeamMultiplexerContext();
+  const inTmux = multiplexerContext === 'tmux';
   const useDedicatedWindow = Boolean(options.newWindow && inTmux);
 
   // Prefer the invoking pane from environment to avoid focus races when users
@@ -441,7 +456,9 @@ export async function createTeamSession(
 
   if (!inTmux) {
     // Backward-compatible fallback: create an isolated detached tmux session
-    // so workflows can run when launched outside an attached tmux client.
+    // so workflows can run when launched outside an attached tmux client. This
+    // also covers cmux, which exposes its own surface metadata without a tmux
+    // pane/window that OMC can split directly.
     const detachedSessionName = `${TMUX_SESSION_PREFIX}-${sanitizeName(teamName)}-${Date.now().toString(36)}`;
     const detachedResult = await execFileAsync('tmux', [
       'new-session', '-d', '-P', '-F', '#S:0 #{pane_id}',

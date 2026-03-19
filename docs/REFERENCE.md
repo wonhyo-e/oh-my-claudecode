@@ -245,6 +245,11 @@ omc team api claim-task --input '{"team_name":"auth-review","task_id":"1","worke
 
 Supported entrypoints: direct start (`omc team [N:agent] "<task>"`), `status`, `shutdown`, and `api`.
 
+Topology behavior:
+- inside classic tmux (`$TMUX` set): reuse the current tmux surface for split-pane or `--new-window` layouts
+- inside cmux (`CMUX_SURFACE_ID` without `$TMUX`): launch a detached tmux session for team workers
+- plain terminal: launch a detached tmux session for team workers
+
 ### `omc session search`
 
 ```bash
