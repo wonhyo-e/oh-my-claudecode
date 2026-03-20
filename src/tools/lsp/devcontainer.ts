@@ -1,11 +1,13 @@
 import { spawnSync } from 'child_process';
-import { existsSync, readFileSync } from 'fs';
-import { resolve, join, relative, sep, dirname, parse } from 'path';
+import { existsSync, readFileSync, readdirSync } from 'fs';
+import { resolve, join, relative, sep, dirname, parse, basename } from 'path';
 import { posix } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { parseJsonc } from '../../utils/jsonc.js';
 
-const DEVCONTAINER_CONFIG_PATH = ['.devcontainer', 'devcontainer.json'] as const;
+const DEVCONTAINER_PRIMARY_CONFIG_PATH = ['.devcontainer', 'devcontainer.json'] as const;
+const DEVCONTAINER_DOTFILE_NAME = '.devcontainer.json' as const;
+const DEVCONTAINER_CONFIG_DIR = '.devcontainer' as const;
 const DEVCONTAINER_LOCAL_FOLDER_LABELS = [
   'devcontainer.local_folder',
   'vsch.local.folder'
@@ -143,8 +145,8 @@ function resolveDevContainerConfigPath(workspaceRoot: string): string | undefine
   let dir = workspaceRoot;
 
   while (true) {
-    const configFilePath = join(dir, ...DEVCONTAINER_CONFIG_PATH);
-    if (existsSync(configFilePath)) {
+    const configFilePath = resolveDevContainerConfigPathAt(dir);
+    if (configFilePath) {
       return configFilePath;
     }
 
@@ -155,6 +157,50 @@ function resolveDevContainerConfigPath(workspaceRoot: string): string | undefine
 
     dir = dirname(dir);
   }
+}
+
+function resolveDevContainerConfigPathAt(dir: string): string | undefined {
+  const primaryConfigPath = join(dir, ...DEVCONTAINER_PRIMARY_CONFIG_PATH);
+  if (existsSync(primaryConfigPath)) {
+    return primaryConfigPath;
+  }
+
+  const dotfileConfigPath = join(dir, DEVCONTAINER_DOTFILE_NAME);
+  if (existsSync(dotfileConfigPath)) {
+    return dotfileConfigPath;
+  }
+
+  const devcontainerDir = join(dir, DEVCONTAINER_CONFIG_DIR);
+  if (!existsSync(devcontainerDir)) {
+    return undefined;
+  }
+
+  const nestedConfigPaths = readdirSync(devcontainerDir, { withFileTypes: true })
+    .filter(entry => entry.isDirectory())
+    .map(entry => join(devcontainerDir, entry.name, 'devcontainer.json'))
+    .filter(existsSync)
+    .sort((left, right) => left.localeCompare(right));
+
+  return nestedConfigPaths[0];
+}
+
+function deriveHostDevContainerRoot(configFilePath: string): string {
+  const resolvedConfigPath = resolve(configFilePath);
+  if (basename(resolvedConfigPath) === DEVCONTAINER_DOTFILE_NAME) {
+    return dirname(resolvedConfigPath);
+  }
+
+  const configParentDir = dirname(resolvedConfigPath);
+  if (basename(configParentDir) === DEVCONTAINER_CONFIG_DIR) {
+    return dirname(configParentDir);
+  }
+
+  const configGrandparentDir = dirname(configParentDir);
+  if (basename(configGrandparentDir) === DEVCONTAINER_CONFIG_DIR) {
+    return dirname(configGrandparentDir);
+  }
+
+  return dirname(configParentDir);
 }
 
 function readDevContainerConfig(configFilePath?: string): DevContainerJson | null {
@@ -284,7 +330,7 @@ function scoreContainerMatch(
   let score = 0;
   let hasDevContainerLabelMatch = false;
   const expectedLocalFolder = configFilePath
-    ? dirname(dirname(configFilePath))
+    ? deriveHostDevContainerRoot(configFilePath)
     : resolve(hostWorkspaceRoot);
 
   for (const label of DEVCONTAINER_LOCAL_FOLDER_LABELS) {
