@@ -362,3 +362,72 @@ describe("writeHudConfig", () => {
     expect(written.omcHud.wrapMode).toBe("truncate");
   });
 });
+
+describe("layout config round-trip", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("readHudConfig preserves layout from settings.json", () => {
+    mockExistsSync.mockImplementation((path) =>
+      String(path).endsWith("settings.json"),
+    );
+    mockReadFileSync.mockReturnValue(
+      JSON.stringify({
+        omcHud: {
+          layout: {
+            line1: ["gitBranch", "model"],
+            main: ["omcLabel", "contextBar"],
+            detail: ["todos"],
+          },
+        },
+      }),
+    );
+
+    const config = readHudConfig();
+
+    expect(config.layout).toEqual({
+      line1: ["gitBranch", "model"],
+      main: ["omcLabel", "contextBar"],
+      detail: ["todos"],
+    });
+  });
+
+  it("readHudConfig returns no layout when not configured", () => {
+    mockExistsSync.mockImplementation((path) =>
+      String(path).endsWith("settings.json"),
+    );
+    mockReadFileSync.mockReturnValue(
+      JSON.stringify({
+        omcHud: {
+          elements: { gitRepo: true },
+        },
+      }),
+    );
+
+    const config = readHudConfig();
+
+    expect(config.layout).toBeUndefined();
+  });
+
+  it("writeHudConfig persists layout to settings.json", () => {
+    mockExistsSync.mockImplementation((path) =>
+      String(path).endsWith("settings.json"),
+    );
+    mockReadFileSync.mockReturnValue(JSON.stringify({}));
+
+    const ok = writeHudConfig({
+      ...DEFAULT_HUD_CONFIG,
+      layout: {
+        main: ["contextBar", "omcLabel", "ralph"],
+      },
+    });
+
+    expect(ok).toBe(true);
+    const [, raw] = mockAtomicWriteFileSync.mock.calls[0] as [string, string];
+    const written = JSON.parse(raw);
+    expect(written.omcHud.layout).toEqual({
+      main: ["contextBar", "omcLabel", "ralph"],
+    });
+  });
+});

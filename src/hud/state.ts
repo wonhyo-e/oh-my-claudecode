@@ -347,6 +347,7 @@ function mergeWithDefaults(config: HudConfigInput): HudConfig {
       ? { rateLimitsProvider: config.rateLimitsProvider }
       : {}),
     ...(config.maxWidth != null ? { maxWidth: config.maxWidth } : {}),
+    ...(config.layout ? { layout: config.layout } : {}),
   };
 }
 
