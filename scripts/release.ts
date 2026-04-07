@@ -29,6 +29,7 @@ import {
   categorizeReleaseNoteEntries,
   generateChangelog,
   generateReleaseBody,
+  getLatestTag,
 } from '../src/lib/release-generation.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -84,14 +85,6 @@ interface GitHubCompareResponse {
 function getCurrentVersion(): string {
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8'));
   return pkg.version;
-}
-
-function getLatestTag(): string {
-  try {
-    return execSync('git describe --tags --abbrev=0', { cwd: ROOT, encoding: 'utf-8' }).trim();
-  } catch {
-    return '';
-  }
 }
 
 function bumpVersion(current: string, bump: string): string {
@@ -343,7 +336,7 @@ ${clr('After running:', c.cyan)}
 
   const currentVersion = getCurrentVersion();
   const newVersion = bumpVersion(currentVersion, bumpArg);
-  const prevTag = getLatestTag();
+  const prevTag = getLatestTag({ excludeTag: `v${newVersion}` });
 
   console.log(clr('\n🚀 Release Automation', c.bold));
   console.log(clr('═══════════════════════\n', c.dim));
