@@ -88,6 +88,21 @@ World`);
       expect(result).not.toContain('<br');
     });
 
+    it('should strip HTML comments that contain keyword triggers', () => {
+      const result = sanitizeForKeywordDetection(`Please review this draft document for tone and clarity:
+
+<!-- ralph: rewrite intro section with more urgency -->
+<!-- autopilot note: Why Artificially Inflating GitHub Star Counts Is Harmful:
+popularity without merit misleads developers, distorts discovery, unfairly rewards dishonest projects, and erodes trust in GitHub stars as a community signal. -->
+
+Final draft.`);
+
+      expect(result).not.toContain('ralph');
+      expect(result).not.toContain('autopilot');
+      expect(result).toContain('Please review this draft document for tone and clarity:');
+      expect(result).toContain('Final draft.');
+    });
+
     it('should strip URLs', () => {
       const result = sanitizeForKeywordDetection('see https://example.com/codex/path');
       expect(result).not.toContain('codex');
@@ -583,6 +598,25 @@ World`);
         const result = detectKeywordsWithType(text);
         const ralphMatch = result.find((r) => r.type === 'ralph');
         expect(ralphMatch).toBeUndefined();
+      });
+
+      it('should not detect keywords inside HTML comments', () => {
+        const text = `Please review this draft document for tone and clarity:
+
+<!-- ralph: rewrite intro section with more urgency -->
+<!-- autopilot note: Why Artificially Inflating GitHub Star Counts Is Harmful:
+popularity without merit misleads developers, distorts discovery, unfairly rewards dishonest projects, and erodes trust in GitHub stars as a community signal. -->
+
+Final draft:
+
+Why Artificially Inflating GitHub Star Counts Is Harmful
+=========================================================
+
+This article argues that fake popularity signals damage trust in open source.`;
+        const result = detectKeywordsWithType(text);
+
+        expect(result.find((r) => r.type === 'ralph')).toBeUndefined();
+        expect(result.find((r) => r.type === 'autopilot')).toBeUndefined();
       });
     });
 
