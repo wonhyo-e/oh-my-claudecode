@@ -379,7 +379,7 @@ export function createHudWatchPane(cwd: string, hudCmd: string): string | null {
 export function killTmuxPane(paneId: string): void {
   if (!paneId.startsWith('%')) return;
   try {
-    tmuxExec(['kill-pane', '-t', paneId], { stripTmux: true, stdio: 'ignore' });
+    tmuxExec(['kill-pane', '-t', paneId], { stdio: 'ignore' });
   } catch {
     // Pane may already be gone; ignore
   }
