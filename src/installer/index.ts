@@ -716,14 +716,15 @@ export function prunePluginDuplicateSkills(log: (msg: string) => void): string[]
     try {
       const standaloneContent = readFileSync(skillMdPath, 'utf-8').trim();
 
-      // Safety check: only remove if the standalone content matches the plugin's
-      // copy (or looks like standard OMC frontmatter). This preserves user-authored
-      // skills that happen to share a name with a plugin skill.
+      // Safety check: only remove if the standalone content exactly matches the
+      // plugin's copy, OR the directory is explicitly marked as OMC-owned via the
+      // .omc-managed marker file. Frontmatter structure alone is not a reliable
+      // ownership signal — user skills routinely use the same ---/name: format.
       const pluginContent = pluginSkillHashes.get(entry.name);
-      const isOmcCreated = standaloneContent.startsWith('---\n') && /^name:\s+\S+/m.test(standaloneContent);
+      const skillDir = join(SKILLS_DIR, entry.name);
 
-      if (pluginContent === standaloneContent || isOmcCreated) {
-        rmSync(join(SKILLS_DIR, entry.name), { recursive: true, force: true });
+      if (pluginContent === standaloneContent || isOmcManagedSkillDir(skillDir)) {
+        rmSync(skillDir, { recursive: true, force: true });
         removed.push(entry.name);
         log(`  Pruned plugin-duplicate skill: ${entry.name}/`);
       }
