@@ -339,6 +339,15 @@ describe('Permission Handler - Dangerous Commands', () => {
     it('should allow repo-scoped inspection commands', () => {
       expect(isSafeRepoInspectionCommand('cat src/sample.ts', testDir)).toBe(true);
       expect(isSafeRepoInspectionCommand('sed -n 1,20p src/sample.ts', testDir)).toBe(true);
+      expect(isSafeRepoInspectionCommand('rg -n value src/sample.ts', testDir)).toBe(true);
+    });
+
+    it('should reject ripgrep directory and hidden sweeps', () => {
+      writeFileSync(join(testDir, '.env.local'), 'SECRET=1\n');
+
+      expect(isSafeRepoInspectionCommand('rg -n SECRET src', testDir)).toBe(false);
+      expect(isSafeRepoInspectionCommand('rg -n SECRET .', testDir)).toBe(false);
+      expect(isSafeRepoInspectionCommand('rg --hidden SECRET .', testDir)).toBe(false);
     });
 
     it('should allow targeted single-test commands', () => {
@@ -396,6 +405,32 @@ describe('Permission Handler - Dangerous Commands', () => {
 
         expect(result.continue).toBe(true);
         expect(result.hookSpecificOutput?.decision?.behavior).toBe('allow');
+      } finally {
+        rmSync(testDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should not auto-allow ripgrep directory or hidden Bash sweeps', () => {
+      const testDir = mkdtempSync(join(tmpdir(), 'permission-request-rg-sweep-'));
+      try {
+        mkdirSync(join(testDir, 'src'), { recursive: true });
+        initializeGitRepo(testDir);
+        writeFileSync(join(testDir, 'src', 'sample.ts'), 'export const SECRET = 1;\n');
+        writeFileSync(join(testDir, '.env.local'), 'SECRET=1\n');
+
+        const directorySweep = processPermissionRequest({
+          ...makePermissionInput('Bash', 'rg -n SECRET .'),
+          cwd: testDir,
+        });
+        expect(directorySweep.continue).toBe(true);
+        expect(directorySweep.hookSpecificOutput?.decision?.behavior).not.toBe('allow');
+
+        const hiddenSweep = processPermissionRequest({
+          ...makePermissionInput('Bash', 'rg --hidden SECRET .'),
+          cwd: testDir,
+        });
+        expect(hiddenSweep.continue).toBe(true);
+        expect(hiddenSweep.hookSpecificOutput?.decision?.behavior).not.toBe('allow');
       } finally {
         rmSync(testDir, { recursive: true, force: true });
       }

@@ -203,7 +203,7 @@ describe('permission-handler', () => {
     it('allows narrow repo inspection commands', () => {
       expect(isSafeRepoInspectionCommand('cat src/sample.ts', testDir)).toBe(true);
       expect(isSafeRepoInspectionCommand('sed -n 1,20p src/sample.ts', testDir)).toBe(true);
-      expect(isSafeRepoInspectionCommand('rg -n value src', testDir)).toBe(true);
+      expect(isSafeRepoInspectionCommand('rg -n value src/sample.ts', testDir)).toBe(true);
       expect(isSafeRepoInspectionCommand('head -n 5 src/sample.ts', testDir)).toBe(true);
     });
 
@@ -211,6 +211,9 @@ describe('permission-handler', () => {
       expect(isSafeRepoInspectionCommand('cat .env.local', testDir)).toBe(false);
       expect(isSafeRepoInspectionCommand('cat ../outside.txt', testDir)).toBe(false);
       expect(isSafeRepoInspectionCommand('rg -n value .git', testDir)).toBe(false);
+      expect(isSafeRepoInspectionCommand('rg -n value src', testDir)).toBe(false);
+      expect(isSafeRepoInspectionCommand('rg -n value .', testDir)).toBe(false);
+      expect(isSafeRepoInspectionCommand('rg --hidden SECRET .', testDir)).toBe(false);
       expect(isSafeRepoInspectionCommand('sed -n 1,20p missing.ts', testDir)).toBe(false);
     });
 
@@ -505,6 +508,21 @@ describe('permission-handler', () => {
         const result = processPermissionRequest(createInput('cat src/safe.ts'));
         expect(result.continue).toBe(true);
         expect(result.hookSpecificOutput?.decision?.behavior).toBe('allow');
+      });
+
+      it('should not auto-approve ripgrep directory or hidden sweeps', () => {
+        fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+        fs.writeFileSync(path.join(testDir, 'src', 'safe.ts'), 'export const SECRET = 1;\n');
+        fs.writeFileSync(path.join(testDir, '.env.local'), 'SECRET=1\n');
+        initializeGitRepo(testDir);
+
+        const directorySweep = processPermissionRequest(createInput('rg -n SECRET .'));
+        expect(directorySweep.continue).toBe(true);
+        expect(directorySweep.hookSpecificOutput?.decision?.behavior).not.toBe('allow');
+
+        const hiddenSweep = processPermissionRequest(createInput('rg --hidden SECRET .'));
+        expect(hiddenSweep.continue).toBe(true);
+        expect(hiddenSweep.hookSpecificOutput?.decision?.behavior).not.toBe('allow');
       });
 
       it('should auto-approve narrowly targeted local test commands', () => {

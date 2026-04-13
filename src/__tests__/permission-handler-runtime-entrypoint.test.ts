@@ -77,6 +77,18 @@ describe('scripts/permission-handler.mjs runtime entrypoint', () => {
     expect(targetedTestResult.hookSpecificOutput?.decision?.behavior).toBe('allow');
   });
 
+  it('does not auto-allow ripgrep directory or hidden sweeps inside a git worktree', () => {
+    writeFileSync(join(gitDir, '.env.local'), 'SECRET=1\n');
+
+    const directorySweepResult = runPermissionHandler('rg -n SECRET .', gitDir);
+    expect(directorySweepResult.continue).toBe(true);
+    expect(directorySweepResult.hookSpecificOutput?.decision?.behavior).not.toBe('allow');
+
+    const hiddenSweepResult = runPermissionHandler('rg --hidden SECRET .', gitDir);
+    expect(hiddenSweepResult.continue).toBe(true);
+    expect(hiddenSweepResult.hookSpecificOutput?.decision?.behavior).not.toBe('allow');
+  });
+
   it('does not auto-allow broad tests or non-git temp directories', () => {
     const broadTestResult = runPermissionHandler('npm test', gitDir);
     expect(broadTestResult.continue).toBe(true);

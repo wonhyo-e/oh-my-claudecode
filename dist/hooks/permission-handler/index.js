@@ -40,7 +40,6 @@ const SAFE_RIPGREP_FLAGS = new Set([
     '--fixed-strings',
     '-i',
     '--ignore-case',
-    '--hidden',
     '--no-heading',
 ]);
 const BACKGROUND_MUTATION_SUBAGENTS = new Set([
@@ -333,7 +332,7 @@ function isSafeRipgrepInspectionCommand(tokens, cwd) {
         return false;
     }
     const searchPaths = tokens.slice(index + 1);
-    return areSafeRepoPaths(cwd, searchPaths, { allowDirectory: true });
+    return areSafeRepoPaths(cwd, searchPaths, { allowDirectory: false });
 }
 function isSafeTargetedVitestCommand(tokens, cwd) {
     const supportedPrefixes = [

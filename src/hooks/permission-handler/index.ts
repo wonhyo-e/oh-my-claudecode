@@ -72,7 +72,6 @@ const SAFE_RIPGREP_FLAGS = new Set([
   '--fixed-strings',
   '-i',
   '--ignore-case',
-  '--hidden',
   '--no-heading',
 ]);
 
@@ -459,7 +458,7 @@ function isSafeRipgrepInspectionCommand(tokens: string[], cwd: string): boolean 
   }
 
   const searchPaths = tokens.slice(index + 1);
-  return areSafeRepoPaths(cwd, searchPaths, { allowDirectory: true });
+  return areSafeRepoPaths(cwd, searchPaths, { allowDirectory: false });
 }
 
 function isSafeTargetedVitestCommand(tokens: string[], cwd: string): boolean {
